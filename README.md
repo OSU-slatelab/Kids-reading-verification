@@ -9,5 +9,5 @@ An attention-based ASR pretraining with teacher forcing is used. To run:
 <code>run_pt.sh</code>
 
 ## Finetuning
-Co-train in-domain ASR with detection. To run:
+Co-train in-domain ASR with detection. To run (5-fold cross-validation):
 <code>run_slu.sh</code>
