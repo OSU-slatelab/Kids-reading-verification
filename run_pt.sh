@@ -1,0 +1,21 @@
+python -u main.py \
+        --nsteps 200000 \
+        --steps-done 0 \
+        --log-after 100 \
+        --val-after 1000 \
+        --train-path "/data/data25/scratch/sunderv/librispeech/train_clean_100.csv" \
+        --valid-path "/data/data25/scratch/sunderv/librispeech/dev_other.csv" \
+        --test-path "/data/data25/scratch/sunderv/librispeech/test_other.csv" \
+        --logging-file "logs/librispeech100_pretrain_las.log" \
+        --tokenizer-path "tokenizers/librispeech.json" \
+        --dict-path "" \
+        --save-path "/data/data24/scratch/sunderv/saved_models/kids_librispeech100_pretrain_las" \
+        --batch-size 32 \
+        --lr 0.0001 \
+        --norm-epoch 3 \
+        --listener-layer 3 \
+        --nspeech-feat 80 \
+        --cuda \
+        --save-model \
+        --pretrain \
+        --seed 1111

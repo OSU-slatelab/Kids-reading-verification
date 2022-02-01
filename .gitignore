@@ -1,0 +1,7 @@
+__pycache__
+*.sw*
+attn_maps/
+logs/
+run_pt_race.sh
+run_gs.sh
+pretrain_tokenizer.py
