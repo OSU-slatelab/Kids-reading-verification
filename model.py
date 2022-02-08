@@ -1,4 +1,4 @@
-from torch.nn.utils.rnn import pack_sequence, pad_packed_sequence
+from torch.nn.utils.rnn import pack_sequence, pad_packed_sequence, pack_padded_sequence
 import pdb
 import numpy as np
 import torch
@@ -61,6 +61,24 @@ class RNN(nn.Module):
         #hn_l = torch.cat([hn[-1][0], hn[-1][1]], dim=1)
         return seq_unpacked, lens_unpacked #hn[-1,0,:,:] + hn[-1,1,:,:]
 
+class pLSTMLayerParallel(nn.Module):
+    def __init__(self, input_feature_dim, dropout_rate=0.1):
+        super(pLSTMLayerParallel, self).__init__()
+        self.pLSTM = nn.LSTM(input_feature_dim, input_feature_dim, 1, bidirectional=False, dropout=dropout_rate, batch_first=False)
+        self.norm = nn.LayerNorm(input_feature_dim)
+        self.dropout = nn.Dropout(dropout_rate)
+
+    def forward(self, input_padded, lens):
+        lens = lens.cpu()
+        pack = pack_padded_sequence(input_padded, lens, batch_first=True, enforce_sorted=False)
+        output, hidden = self.pLSTM(pack)
+        output_padded, lens_unpacked = pad_packed_sequence(output, batch_first=True)
+        # residual connection b/w subsequent layers
+        output_padded = self.norm(output_padded+self.dropout(input_padded))
+        output_padded_batchf = self.dropout(output_padded)
+        return output_padded_batchf
+
+
 # LSTM layer for pLSTM
 # Step 1. Reduce time resolution to half
 # Step 2. Run through pLSTM
@@ -71,10 +89,11 @@ class pLSTMLayer(nn.Module):
         self.rnn_unit = getattr(nn,rnn_unit.upper())
 
         # feature dimension will be doubled since time resolution reduction
-        self.pLSTM = self.rnn_unit(input_feature_dim, input_feature_dim, 1, bidirectional=False, dropout=dropout_rate, batch_first=False)
-        self.norm = nn.LayerNorm(input_feature_dim)
-        self.dropout = nn.Dropout(dropout_rate)
-        self.add_norm = add_norm
+        #self.pLSTM = self.rnn_unit(input_feature_dim, input_feature_dim, 1, bidirectional=False, dropout=dropout_rate, batch_first=False)
+        #self.norm = nn.LayerNorm(input_feature_dim)
+        #self.dropout = nn.Dropout(dropout_rate)
+        #self.add_norm = add_norm
+        self.pLSTM = nn.DataParallel(pLSTMLayerParallel(input_feature_dim), device_ids=[0,1])
     
     def forward(self, input_x):
         batch_size = len(input_x)
@@ -85,15 +104,21 @@ class pLSTMLayer(nn.Module):
             feature_dim = x.size(1)
             red_x.append(x.contiguous().view(int(timestep/2), feature_dim*2))
         pack = pack_sequence(red_x, enforce_sorted=False)
-        output, hidden = self.pLSTM(pack)
-        output_padded, lens_unpacked = pad_packed_sequence(output)
-        # residual connection b/w subsequent layers
-        if self.add_norm:
-            input_padded, _ = pad_packed_sequence(pack) 
-            output_padded = self.norm(output_padded+self.dropout(input_padded)) 
-        output_padded_batchf = self.dropout(output_padded).permute(1,0,2)
-        out_list = [output_padded_batchf[i][:l] for i, l in enumerate(list(lens_unpacked))]
+        padded, lens = pad_packed_sequence(pack, batch_first=True)
+        output_padded_batchf = self.pLSTM(padded, lens)
+        out_list = [output_padded_batchf[i][:l] for i, l in enumerate(lens.long().cpu().tolist())]
         return out_list, hidden
+        
+        #pack = pack_sequence(red_x, enforce_sorted=False)
+        #output, hidden = self.pLSTM(pack)
+        #output_padded, lens_unpacked = pad_packed_sequence(output)
+        ## residual connection b/w subsequent layers
+        #if self.add_norm:
+        #    input_padded, _ = pad_packed_sequence(pack) 
+        #    output_padded = self.norm(output_padded+self.dropout(input_padded)) 
+        #output_padded_batchf = self.dropout(output_padded).permute(1,0,2)
+        #out_list = [output_padded_batchf[i][:l] for i, l in enumerate(list(lens_unpacked))]
+        #return out_list, hidden
 
 # Listener is a pLSTM stacking n layers to reduce time resolution 2^n times
 class Listener(nn.Module):

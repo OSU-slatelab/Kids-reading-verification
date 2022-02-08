@@ -1,5 +1,5 @@
 from util import *
-from model import *
+from model2 import *
 from train import *
 from data import *
 from logging.handlers import RotatingFileHandler
@@ -17,6 +17,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--cuda', action='store_true',
                         help='use CUDA')
+    parser.add_argument('--multi-gpu', action='store_true',
+                        help='')
     parser.add_argument('--pretrain', action='store_true',
                         help='')
     parser.add_argument('--best-model', action='store_true',
@@ -49,7 +51,11 @@ if __name__ == "__main__":
                         help='')
     parser.add_argument('--nspeech-feat', type=int, default=80,
                         help='')
-    parser.add_argument('--listener-layer', type=int, default=3,
+    parser.add_argument('--pyr-layer', type=int, default=3,
+                        help='')
+    parser.add_argument('--nlayer', type=int, default=6,
+                        help='')
+    parser.add_argument('--nhead', type=int, default=1,
                         help='')
     parser.add_argument('--nsteps', type=int, default=250000,
                         help='')
@@ -58,6 +64,8 @@ if __name__ == "__main__":
     parser.add_argument('--log-after', type=int, default=100,
                         help='')
     parser.add_argument('--val-after', type=int, default=500,
+                        help='')
+    parser.add_argument('--save-after', type=int, default=500,
                         help='')
     parser.add_argument('--sample-rate', type=int, default=16000,
                         help='')
@@ -84,7 +92,7 @@ if __name__ == "__main__":
         if not args.cuda:
             print("WARNING: You have a CUDA device, so you should probably run with --cuda")
         else:
-            device = torch.device("cuda")
+            device = torch.device("cuda:0")
 
     # Set the random seed manually for reproducibility.
     torch.manual_seed(args.seed)
@@ -98,7 +106,7 @@ if __name__ == "__main__":
     logger.addHandler(rfh)
 
     vocab_size = 2+Tokenizer.from_file(args.tokenizer_path).get_vocab_size()
-    config = {'embed_dim':args.embed_dim, 'vocab_size':vocab_size, 'device':device, 'dropout':args.dropout, 'input_dim':args.nspeech_feat, 'listener_layer':args.listener_layer, 'nclasses':args.nclasses, 'pretrain':args.pretrain}
+    config = {'embed_dim':args.embed_dim, 'vocab_size':vocab_size, 'dropout':args.dropout, 'input_dim':args.nspeech_feat, 'pyr_layer':args.pyr_layer, 'nlayer':args.nlayer, 'multi-gpu':args.multi_gpu, 'nhead':args.nhead, 'nclasses':args.nclasses, 'pretrain':args.pretrain}
 
     print(f'Loading model.')
     if args.pretrain:

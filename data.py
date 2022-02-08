@@ -1,4 +1,5 @@
 from tqdm import tqdm
+from torch.nn.utils.rnn import pack_sequence, pad_packed_sequence, pack_padded_sequence
 from itertools import chain
 from tokenizers import Tokenizer
 from speechbrain.processing.features import STFT, spectral_magnitude, Filterbank, Deltas, InputNormalization, ContextWindow
@@ -106,22 +107,24 @@ class Collator(object):
         self.tokenizer = Tokenizer.from_file(args.tokenizer_path)
 
     def __call__(self, lst):
-        lst = sorted(lst, key=lambda tup: len(tup[1]), reverse=True)
-        speech_batch = [pad(x[0].squeeze(0), factor=2**self.args.listener_layer).unsqueeze(0) for x in lst if x[0].size(1) > 2]
+        #lst = sorted(lst, key=lambda tup: len(tup[1]), reverse=True)
+        speech_batch = [pad(x[0].squeeze(0), factor=2**self.args.pyr_layer).unsqueeze(0) for x in lst if x[0].size(1) > 2]
         X, lens, lmax = padding(speech_batch)
         text_raw = [x[1] for x in lst if x[0].size(1) > 2]
         tokenized = self.tokenizer.encode_batch(text_raw)
         if not self.args.pretrain:
-            text_batch = [torch.tensor([30000]+x.ids).long() for x in tokenized]
+            text_batch = pack_sequence([torch.tensor([30000]+x.ids).long() for x in tokenized], enforce_sorted=False)
+            text_batch, lens_t = pad_packed_sequence(text_batch, batch_first=True)            
             token_target = [torch.tensor(x.ids+[30001]).long() for x in tokenized]
             token_target = torch.cat(token_target)
             merge_idx = [merge(x.tokens) for x in tokenized]
             cls_target = torch.cat([torch.tensor(x[2]) for x in lst if x[0].size(1) > 2])
         else:
-            text_batch = [torch.tensor([30000]+x.ids).long() for x in tokenized]
+            text_batch = pack_sequence([torch.tensor([30000]+x.ids).long() for x in tokenized], enforce_sorted=False)
+            text_batch, lens_t = pad_packed_sequence(text_batch, batch_first=True)            
             token_target = [torch.tensor(x.ids+[30001]).long() for x in tokenized]
             token_target = torch.cat(token_target)
             merge_idx = None
             cls_target = None
 
-        return X, lens, lmax, text_batch, token_target, merge_idx, cls_target
+        return X, torch.tensor(lens), lmax, text_batch, lens_t, token_target, merge_idx, cls_target
