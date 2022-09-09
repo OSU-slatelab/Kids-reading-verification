@@ -1,0 +1,25 @@
+python -u main.py \
+        --nsteps 5000 \
+        --save-after 5000 \
+        --steps-done 0 \
+        --log-after 150 \
+        --val-after 150 \
+        --train-path "/data/data25/scratch/sunderv/cmu_kids/train_cmu.csv" \
+        --valid-path "/data/data25/scratch/sunderv/cmu_kids/valid_cmu.csv" \
+        --test-path "/data/data25/scratch/sunderv/cmu_kids/valid_cmu.csv" \
+        --logging-file "logs/cmu_pretrain_las.log" \
+        --tokenizer-path "tokenizers/librispeech.json" \
+        --dict-path "" \
+        --save-path "/data/data24/scratch/sunderv/saved_models/kids_cmu_pretrain_las" \
+        --batch-size 32 \
+        --lr 0.0001 \
+        --norm-epoch 3 \
+        --pyr-layer 3 \
+        --nlayer 6 \
+        --nspeech-feat 80 \
+        --sample-rate 16000 \
+        --multi-gpu \
+        --save-model \
+        --cuda \
+        --pretrain \
+        --seed 1111

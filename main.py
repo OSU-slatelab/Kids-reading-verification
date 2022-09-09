@@ -12,6 +12,7 @@ import copy
 import argparse
 import time
 import random
+#torch.autograd.set_detect_anomaly(True)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -19,11 +20,19 @@ if __name__ == "__main__":
                         help='use CUDA')
     parser.add_argument('--multi-gpu', action='store_true',
                         help='')
+    parser.add_argument('--word-by-word', action='store_true',
+                        help='')
     parser.add_argument('--pretrain', action='store_true',
                         help='')
     parser.add_argument('--best-model', action='store_true',
                         help='')
     parser.add_argument('--save-model', action='store_true',
+                        help='')
+    parser.add_argument('--decouple', action='store_true',
+                        help='')
+    parser.add_argument('--pairwise', action='store_true',
+                        help='')
+    parser.add_argument('--phonet', action='store_true',
                         help='')
     parser.add_argument('--seed', type=int, default=1111,
                         help='random seed')
@@ -31,6 +40,8 @@ if __name__ == "__main__":
                         help='')
     parser.add_argument('--normalizer', type=str, default='',
                         help='')
+    parser.add_argument('--vocab-path', type=str, default='',
+                        help='log file')
     parser.add_argument('--logging-file', type=str, default='',
                         help='log file')
     parser.add_argument('--tokenizer-path', type=str, default='',
@@ -61,6 +72,8 @@ if __name__ == "__main__":
                         help='')
     parser.add_argument('--steps-done', type=int, default=0,
                         help='')
+    parser.add_argument('--accumulate-after', type=int, default=1,
+                        help='')
     parser.add_argument('--log-after', type=int, default=100,
                         help='')
     parser.add_argument('--val-after', type=int, default=500,
@@ -76,6 +89,12 @@ if __name__ == "__main__":
     parser.add_argument('--dropout', type=float, default=0.1,
                         help='')
     parser.add_argument('--asr-wt', type=float, default=0.1,
+                        help='')
+    parser.add_argument('--con-wt', type=float, default=0.1,
+                        help='')
+    parser.add_argument('--beta', type=float, default=0.9999,
+                        help='')
+    parser.add_argument('--gamma', type=float, default=2.0,
                         help='')
     parser.add_argument('--lr', type=float, default=2e-5,
                         help='')
@@ -111,6 +130,10 @@ if __name__ == "__main__":
     print(f'Loading model.')
     if args.pretrain:
         model = ASR(config)
+    elif args.word_by_word:
+        model = WordCLS(config)
+    elif args.phonet:
+        model = PhonetCLS(config)
     else:
         model = Detector(config)
     if args.dict_path != '':
@@ -119,11 +142,31 @@ if __name__ == "__main__":
     print(f'Done.')
 
     optimizer = optim.AdamW(model.parameters(), lr=args.lr, betas=[0.9, 0.999], eps=1e-8, weight_decay=0)
-    data_train = SpeechDataset(args, args.train_path, args.audio_path, n_mels=args.nspeech_feat, sample_rate=args.sample_rate)
-    data_valid = SpeechDataset(args, args.valid_path, args.audio_path, n_mels=args.nspeech_feat, sample_rate=args.sample_rate)
-    data_test = SpeechDataset(args, args.test_path, args.audio_path, n_mels=args.nspeech_feat, sample_rate=args.sample_rate)
+    if args.word_by_word:
+        data_train = WordDataset(args, args.train_path, args.audio_path, n_mels=args.nspeech_feat, sample_rate=args.sample_rate)
+        data_valid = WordDataset(args, args.valid_path, args.audio_path, n_mels=args.nspeech_feat, sample_rate=args.sample_rate, train=False)
+        data_test = WordDataset(args, args.test_path, args.audio_path, n_mels=args.nspeech_feat, sample_rate=args.sample_rate, train=False)
+    elif args.phonet:
+        data_train = PhonetDataset(args, args.train_path, args.audio_path, n_mels=args.nspeech_feat, sample_rate=args.sample_rate)
+        data_valid = PhonetDataset(args, args.valid_path, args.audio_path, n_mels=args.nspeech_feat, sample_rate=args.sample_rate, train=False)
+        data_test = PhonetDataset(args, args.test_path, args.audio_path, n_mels=args.nspeech_feat, sample_rate=args.sample_rate, train=False)
+    else:
+        data_train = SpeechDataset(args, args.train_path, args.audio_path, n_mels=args.nspeech_feat, sample_rate=args.sample_rate)
+        data_valid = SpeechDataset(args, args.valid_path, args.audio_path, n_mels=args.nspeech_feat, sample_rate=args.sample_rate, train=False)
+        data_test = SpeechDataset(args, args.test_path, args.audio_path, n_mels=args.nspeech_feat, sample_rate=args.sample_rate, train=False)
     trainer = Trainer(args, data_train, device, optimizer, data_valid=data_valid, data_test=data_test)
     if args.pretrain:
         trainer.pretrain(model, logger, args.nsteps, args.log_after, args.val_after)
     else:
-        trainer.detect(model, logger)
+        if args.decouple:
+            trainer.detect_decouple(model, logger)
+        elif args.pairwise:
+            trainer.detect_pairwise(model, logger)
+        elif args.word_by_word:
+            trainer.detect_word(model, logger)
+        elif args.phonet:
+            trainer.detect_phonet(model, logger)
+        else:
+            trainer.detect(model, logger)
+        #trainer.evaluate(model, trainer.loader_va)
+        #print(trainer.evaluate(model, trainer.loader_te))
