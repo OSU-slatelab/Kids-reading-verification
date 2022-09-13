@@ -11,3 +11,6 @@ An attention-based ASR pretraining with teacher forcing is used. To run:
 ## Finetuning
 Co-train in-domain ASR with detection. To run (5-fold cross-validation):
 <code>run_slu.sh</code>
+
+## For one-off testing or deployment
+<code>python test.py --audio-path path/to/audio --text 'passage read'</code>
