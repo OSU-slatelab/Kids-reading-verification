@@ -88,3 +88,6 @@ def save(model, path):
 
 def load(model, path):
     model.load_state_dict(torch.load(path))
+
+def save_checkpoint(state, filename):
+    torch.save(state, filename)

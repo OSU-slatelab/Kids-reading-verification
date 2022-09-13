@@ -463,7 +463,11 @@ class Detector(nn.Module):
     def decouple_hier(self, input_s, input_t, lens_s, lens_t, merge_idx=None, label_cat=None, label_det=None):
         listened, lens_s_ = self.listener(input_s, lens_s)
         read, lens_t_ = self.reader(input_t, lens_t)
-        mask_s, mask_t = get_mask(lens_s_.cpu().tolist()).to(read.get_device()), get_mask(lens_t_.cpu().tolist()).to(read.get_device())
+        dev = read.get_device()
+        if dev != -1:
+            mask_s, mask_t = get_mask(lens_s_.cpu().tolist()).to(dev), get_mask(lens_t_.cpu().tolist()).to(dev)
+        else:
+            mask_s, mask_t = get_mask(lens_s_.cpu().tolist()), get_mask(lens_t_.cpu().tolist())
 
         aligned_tq, attn_tq = self.attention(read.permute(1,0,2), listened.permute(1,0,2), mask_s.bool())
 

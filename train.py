@@ -525,6 +525,7 @@ class Trainer(object):
                 loss_list.append(loss.item())
                 loss_cls_list.append(loss_cls.item())
                 loss_tok_list.append(loss_tok.item())
+            save_pick(self.norm, '/data/data24/scratch/sunderv/saved_models/readr.pickle')
             print(f'Running validation.') 
             score_val = self.evaluate_decouple(model, self.loader_va)
             if best_score is None or best_score < score_val:
